@@ -1,5 +1,6 @@
 import os
 import telebot
+import hashlib
 from logic import download_audio
 from config import TOKEN
 
@@ -32,8 +33,6 @@ def handle_message(message):
             
             status_msg = bot.send_message(message.chat.id, "Качаем...")
             
-            # Генерируем уникальное имя файла
-            import hashlib
             file_hash = hashlib.md5(url.encode()).hexdigest()[:8]
             output_path = f"audio_{file_hash}.mp3"
             
@@ -44,6 +43,13 @@ def handle_message(message):
                                     message.chat.id, 
                                     status_msg.message_id)
                 
+                if os.path.getsize(output_path) > 50 * 1024 * 1024:
+                    bot.edit_message_text(
+                        "Айяй... Файлик слишком большой для Telegram (>50 МБ). Попробуй другое видео ╥﹏╥",
+                         message.chat.id, status_msg.message_id)
+                    os.remove(output_path)
+                    return
+                        
                 with open(output_path, 'rb') as audio_file:
                     bot.send_audio(
                         message.chat.id, 
@@ -65,14 +71,34 @@ def handle_message(message):
                 
         except Exception as e:
             bot.send_message(message.chat.id, f"Произошла ошибочка?? {str(e)}")
+        except yt_dlp.utils.DownloadError as de:
+            error_msg = "Ойййч... Видео не скачалось (｡•́︿•̀｡) Может, его удалили или оно закрыто?"
+            if status_msg:
+                bot.edit_message_text(error_msg, message.chat.id, status_msg.message_id)
+            else:
+                bot.send_message(message.chat.id, error_msg)
+        except requests.exceptions.ConnectionError:
+            msg = "Ойййч... Кажется, инет барахлят (´｡• ᵕ •｡`) Проверь соединение."
+            if status_msg:
+                bot.edit_message_text(msg, message.chat.id, status_msg.message_id)
+            else:
+                bot.send_message(message.chat.id, msg)
+        except OSError as ose:
+            msg = f"Ойййч... Ошибочка с файликом: {str(ose)[:100]}"
+            if status_msg:
+                bot.edit_message_text(msg, message.chat.id, status_msg.message_id)
+            else:
+                bot.send_message(message.chat.id, msg)
+        except telebot.apihelper.ApiTelegramException as te:
+            msg = f"Ойййч... Телега ругается: {str(te)[:100]}"
+            if status_msg:
+                bot.edit_message_text(msg, message.chat.id, status_msg.message_id)
+            else:
+                bot.send_message(message.chat.id, msg)   
     else:
         bot.send_message(message.chat.id, 
                         "Пожалуйста, отправь ссылку на YouTube видео.\n"
                         "Пример: https://youtube.com/watch?v=VIDEO_ID")
-
-@bot.message_handler(content_types=['text'])
-def handle_text(message):
-    pass
 
 if __name__ == "__main__":
     print("Я готов, босс")
