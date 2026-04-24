@@ -1,6 +1,8 @@
 import os
 import telebot
 import hashlib
+import yt_dlp
+import requests
 from logic import download_audio
 from config import TOKEN
 
